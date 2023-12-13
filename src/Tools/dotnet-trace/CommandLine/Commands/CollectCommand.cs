@@ -19,17 +19,22 @@ using Microsoft.Tools.Common;
 
 namespace Microsoft.Diagnostics.Tools.Trace
 {
-    internal static class CollectCommandHandler
+    public static class CollectCommandHandler
     {
         internal static bool IsQuiet
         { get; set; }
 
+        public static class ProcessLogger {
+            public static Action<string> WriteLine;
+            public static Action<string> ErrorWriteLine;
+        }
         private static void ConsoleWriteLine(string str)
         {
-            if (!IsQuiet)
-            {
-                Console.Out.WriteLine(str);
-            }
+            ProcessLogger.WriteLine?.Invoke(str);
+        }
+        private static void ConsoleErrorWriteLine(string str)
+        {
+            ProcessLogger.ErrorWriteLine?.Invoke(str);
         }
 
         private delegate Task<int> CollectDelegate(CancellationToken ct, IConsole console, int processId, FileInfo output, uint buffersize, string providers, string profile, TraceFileFormat format, TimeSpan duration, string clrevents, string clreventlevel, string name, string port, bool showchildio, bool resumeRuntime, string stoppingEventProviderName, string stoppingEventEventName, string stoppingEventPayloadFilter, bool? rundown);
@@ -58,8 +63,23 @@ namespace Microsoft.Diagnostics.Tools.Trace
         /// <param name="stoppingEventPayloadFilter">A string, parsed as [payload_field_name]:[payload_field_value] pairs separated by commas, that will stop the trace upon hitting an event with a matching payload. Requires `--stopping-event-provider-name` and `--stopping-event-event-name` to be set.</param>
         /// <param name="rundown">Collect rundown events.</param>
         /// <returns></returns>
-        private static async Task<int> Collect(CancellationToken ct, IConsole console, int processId, FileInfo output, uint buffersize, string providers, string profile, TraceFileFormat format, TimeSpan duration, string clrevents, string clreventlevel, string name, string diagnosticPort, bool showchildio, bool resumeRuntime, string stoppingEventProviderName, string stoppingEventEventName, string stoppingEventPayloadFilter, bool? rundown)
+        public static async Task<int> Collect(CancellationToken ct, int processId, FileInfo output, string diagnosticPort)
         {
+            uint buffersize = DefaultCircularBufferSizeInMB();
+            string providers = string.Empty;
+            string profile = string.Empty;
+            TimeSpan duration = default;
+            TraceFileFormat format = TraceFileFormat.Speedscope;
+            string clrevents = string.Empty;
+            string clreventlevel = string.Empty;
+            string name = null;
+            bool showchildio = false;
+            bool resumeRuntime = true;
+			string stoppingEventProviderName = null;
+			string stoppingEventEventName = null;
+			string stoppingEventPayloadFilter = null;
+			bool? rundown = null;
+
             bool collectionStopped = false;
             bool cancelOnEnter = true;
             bool cancelOnCtrlC = true;
@@ -88,14 +108,14 @@ namespace Microsoft.Diagnostics.Tools.Trace
 
                 if (!cancelOnCtrlC)
                 {
-                    ct = CancellationToken.None;
+
                 }
 
                 if (!ProcessLauncher.Launcher.HasChildProc)
                 {
                     if (showchildio)
                     {
-                        Console.WriteLine("--show-child-io must not be specified when attaching to a process");
+                        ConsoleWriteLine("--show-child-io must not be specified when attaching to a process");
                         return (int)ReturnCode.ArgumentError;
                     }
                     if (CommandUtils.ValidateArgumentsForAttach(processId, name, diagnosticPort, out int resolvedProcessId))
@@ -134,7 +154,7 @@ namespace Microsoft.Diagnostics.Tools.Trace
                         .FirstOrDefault(p => p.Name.Equals(profile, StringComparison.OrdinalIgnoreCase));
                     if (selectedProfile == null)
                     {
-                        Console.Error.WriteLine($"Invalid profile name: {profile}");
+                        ConsoleErrorWriteLine($"Invalid profile name: {profile}");
                         return (int)ReturnCode.ArgumentError;
                     }
 
@@ -167,7 +187,7 @@ namespace Microsoft.Diagnostics.Tools.Trace
 
                 if (providerCollection.Count <= 0)
                 {
-                    Console.Error.WriteLine("No providers were specified to start a trace.");
+                    ConsoleErrorWriteLine("No providers were specified to start a trace.");
                     return (int)ReturnCode.ArgumentError;
                 }
 
@@ -287,18 +307,18 @@ namespace Microsoft.Diagnostics.Tools.Trace
                         }
                         catch (DiagnosticsClientException e)
                         {
-                            Console.Error.WriteLine($"Unable to start a tracing session: {e}");
+                            ConsoleErrorWriteLine($"Unable to start a tracing session: {e}");
                             return (int)ReturnCode.SessionCreationError;
                         }
                         catch (UnauthorizedAccessException e)
                         {
-                            Console.Error.WriteLine($"dotnet-trace does not have permission to access the specified app: {e.GetType()}");
+                            ConsoleErrorWriteLine($"dotnet-trace does not have permission to access the specified app: {e.GetType()}");
                             return (int)ReturnCode.SessionCreationError;
                         }
 
                         if (session == null)
                         {
-                            Console.Error.WriteLine("Unable to create session.");
+                            ConsoleErrorWriteLine("Unable to create session.");
                             return (int)ReturnCode.SessionCreationError;
                         }
 
@@ -383,7 +403,7 @@ namespace Microsoft.Diagnostics.Tools.Trace
                                 }
                             };
 
-                            while (!shouldExit.WaitOne(100) && !(cancelOnEnter && Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Enter))
+                            while (!shouldExit.WaitOne(100))
                             {
                                 printStatus();
                             }
@@ -444,13 +464,13 @@ namespace Microsoft.Diagnostics.Tools.Trace
             }
             catch (CommandLineErrorException e)
             {
-                Console.Error.WriteLine($"[ERROR] {e.Message}");
+                ConsoleErrorWriteLine($"[ERROR] {e.Message}");
                 collectionStopped = true;
                 ret = (int)ReturnCode.TracingError;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[ERROR] {ex}");
+                ConsoleErrorWriteLine($"[ERROR] {ex}");
                 collectionStopped = true;
                 ret = (int)ReturnCode.TracingError;
             }
@@ -458,10 +478,7 @@ namespace Microsoft.Diagnostics.Tools.Trace
             {
                 if (printStatusOverTime)
                 {
-                    if (console.GetTerminal() != null)
-                    {
-                        Console.CursorVisible = true;
-                    }
+
                 }
 
                 if (ProcessLauncher.Launcher.HasChildProc)
@@ -516,7 +533,7 @@ namespace Microsoft.Diagnostics.Tools.Trace
                 description: "Collects a diagnostic trace from a currently running process or launch a child process and trace it. Append -- to the collect command to instruct the tool to run a command and trace it immediately. When tracing a child process, the exit code of dotnet-trace shall be that of the traced process unless the trace process encounters an error.")
             {
                 // Handler
-                HandlerDescriptor.FromDelegate((CollectDelegate)Collect).GetCommandHandler(),
+
                 // Options
                 CommonOptions.ProcessIdOption(),
                 CircularBufferOption(),
