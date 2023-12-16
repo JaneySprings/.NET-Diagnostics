@@ -58,13 +58,11 @@ namespace Microsoft.Diagnostics.Tools.Trace
         /// <param name="showchildio">Should IO from a child process be hidden.</param>
         /// <param name="resumeRuntime">Resume runtime once session has been initialized.</param>
         /// <returns></returns>
-        public static async Task<int> Collect(CancellationToken ct, int processId, FileInfo output, string diagnosticPort)
+        public static async Task<int> Collect(CancellationToken ct, int processId, FileInfo output, TraceFileFormat format, string diagnosticPort, string providers)
         {
             uint buffersize = DefaultCircularBufferSizeInMB();
-            string providers = string.Empty;
             string profile = string.Empty;
             TimeSpan duration = default;
-            TraceFileFormat format = TraceFileFormat.Speedscope;
             string clrevents = string.Empty;
             string clreventlevel = string.Empty;
             string name = null;
