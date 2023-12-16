@@ -63,13 +63,11 @@ namespace Microsoft.Diagnostics.Tools.Trace
         /// <param name="stoppingEventPayloadFilter">A string, parsed as [payload_field_name]:[payload_field_value] pairs separated by commas, that will stop the trace upon hitting an event with a matching payload. Requires `--stopping-event-provider-name` and `--stopping-event-event-name` to be set.</param>
         /// <param name="rundown">Collect rundown events.</param>
         /// <returns></returns>
-        public static async Task<int> Collect(CancellationToken ct, int processId, FileInfo output, string diagnosticPort)
+        public static async Task<int> Collect(CancellationToken ct, int processId, FileInfo output, TraceFileFormat format, string diagnosticPort, string providers)
         {
             uint buffersize = DefaultCircularBufferSizeInMB();
-            string providers = string.Empty;
             string profile = string.Empty;
             TimeSpan duration = default;
-            TraceFileFormat format = TraceFileFormat.Speedscope;
             string clrevents = string.Empty;
             string clreventlevel = string.Empty;
             string name = null;

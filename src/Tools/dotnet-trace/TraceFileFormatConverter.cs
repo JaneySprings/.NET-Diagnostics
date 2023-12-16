@@ -12,7 +12,7 @@ using Microsoft.Diagnostics.Tracing.Stacks.Formats;
 
 namespace Microsoft.Diagnostics.Tools.Trace
 {
-    internal enum TraceFileFormat { NetTrace, Speedscope, Chromium };
+    public enum TraceFileFormat { NetTrace, Speedscope, Chromium };
 
     internal static class TraceFileFormatConverter
     {
@@ -30,7 +30,7 @@ namespace Microsoft.Diagnostics.Tools.Trace
             }
 
             outputFilename = Path.ChangeExtension(outputFilename, TraceFileFormatExtensions[format]);
-            Console.Out.WriteLine($"Writing:\t{outputFilename}");
+            CollectCommandHandler.ProcessLogger.WriteLine($"Writing:\t{outputFilename}");
 
             switch (format)
             {
@@ -48,12 +48,12 @@ namespace Microsoft.Diagnostics.Tools.Trace
                     {
                         if (ex.ToString().Contains("Read past end of stream."))
                         {
-                            Console.WriteLine("Detected a potentially broken trace. Continuing with best-efforts to convert the trace, but resulting speedscope file may contain broken stacks as a result.");
+                            CollectCommandHandler.ProcessLogger.ErrorWriteLine("Detected a potentially broken trace. Continuing with best-efforts to convert the trace, but resulting speedscope file may contain broken stacks as a result.");
                             Convert(format, fileToConvert, outputFilename, true);
                         }
                         else
                         {
-                            Console.WriteLine(ex);
+                            CollectCommandHandler.ProcessLogger.ErrorWriteLine(ex.Message);
                         }
                     }
                     break;
@@ -61,7 +61,7 @@ namespace Microsoft.Diagnostics.Tools.Trace
                     // Validation happened way before this, so we shoud never reach this...
                     throw new ArgumentException($"Invalid TraceFileFormat \"{format}\"");
             }
-            Console.Out.WriteLine("Conversion complete");
+            CollectCommandHandler.ProcessLogger.WriteLine("Conversion complete");
         }
 
         private static void Convert(TraceFileFormat format, string fileToConvert, string outputFilename, bool continueOnError = false)
