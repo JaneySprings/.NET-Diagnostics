@@ -14,8 +14,21 @@ using Microsoft.Tools.Common;
 
 namespace Microsoft.Diagnostics.Tools.GCDump
 {
-    internal static class CollectCommandHandler
+    public static class CollectCommandHandler
     {
+        public static class ProcessLogger {
+            public static Action<string> WriteLine;
+            public static Action<string> ErrorWriteLine;
+        }
+        private static void ConsoleWriteLine(string str)
+        {
+            ProcessLogger.WriteLine?.Invoke(str);
+        }
+        private static void ConsoleErrorWriteLine(string str)
+        {
+            ProcessLogger.ErrorWriteLine?.Invoke(str);
+        }
+
         private delegate Task<int> CollectDelegate(CancellationToken ct, IConsole console, int processId, string output, int timeout, bool verbose, string name, string diagnosticPort);
 
         /// <summary>
@@ -30,8 +43,12 @@ namespace Microsoft.Diagnostics.Tools.GCDump
         /// <param name="name">The process name to collect the gcdump from.</param>
         /// <param name="diagnosticPort">The diagnostic IPC channel to collect the gcdump from.</param>
         /// <returns></returns>
-        private static async Task<int> Collect(CancellationToken ct, IConsole console, int processId, string output, int timeout, bool verbose, string name, string diagnosticPort)
+        public static async Task<int> Collect(CancellationToken ct, int processId, string output, string diagnosticPort)
         {
+            int timeout = DefaultTimeout;
+            bool verbose = false;
+            string name = string.Empty;
+
             if (!CommandUtils.ValidateArgumentsForAttach(processId, name, diagnosticPort, out int resolvedProcessId))
             {
                 return -1;
@@ -46,13 +63,13 @@ namespace Microsoft.Diagnostics.Tools.GCDump
                     IpcEndpointConfig config = IpcEndpointConfig.Parse(diagnosticPort);
                     if (!config.IsConnectConfig)
                     {
-                        Console.Error.WriteLine("--diagnostic-port is only supporting connect mode.");
+                        ConsoleErrorWriteLine("--diagnostic-port is only supporting connect mode.");
                         return -1;
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine($"--diagnostic-port argument error: {ex.Message}");
+                    ConsoleErrorWriteLine($"--diagnostic-port argument error: {ex.Message}");
                     return -1;
                 }
 
@@ -77,7 +94,7 @@ namespace Microsoft.Diagnostics.Tools.GCDump
                     outputFileInfo = new FileInfo(outputFileInfo.FullName + ".gcdump");
                 }
 
-                Console.Out.WriteLine($"Writing gcdump to '{outputFileInfo.FullName}'...");
+                ConsoleWriteLine($"Writing gcdump to '{outputFileInfo.FullName}'...");
 
                 Task<bool> dumpTask = Task.Run(() => {
                     if (TryCollectMemoryGraph(ct, processId, diagnosticPort, timeout, verbose, out MemoryGraph memoryGraph))
@@ -94,23 +111,29 @@ namespace Microsoft.Diagnostics.Tools.GCDump
                 if (fDumpSuccess)
                 {
                     outputFileInfo.Refresh();
-                    Console.Out.WriteLine($"\tFinished writing {outputFileInfo.Length} bytes.");
+                    ConsoleWriteLine($"\tFinished writing {outputFileInfo.Length} bytes.");
                     return 0;
                 }
                 else if (ct.IsCancellationRequested)
                 {
-                    Console.Out.WriteLine("\tCancelled.");
+#if DOTNET_METEOR
+                    outputFileInfo.Refresh();
+                    ConsoleWriteLine($"\tFinished writing {outputFileInfo.Length} bytes.");
+                    return 0;
+#else
+                    ConsoleWriteLine("\tCancelled.");
                     return -1;
+#endif
                 }
                 else
                 {
-                    Console.Out.WriteLine("\tFailed to collect gcdump. Try running with '-v' for more information.");
+                    ConsoleWriteLine("\tFailed to collect gcdump. Try running with '-v' for more information.");
                     return -1;
                 }
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[ERROR] {ex}");
+                ConsoleWriteLine($"[ERROR] {ex}");
                 return -1;
             }
         }
@@ -137,7 +160,6 @@ namespace Microsoft.Diagnostics.Tools.GCDump
                 description: "Collects a diagnostic trace from a currently running process")
             {
                 // Handler
-                HandlerDescriptor.FromDelegate((CollectDelegate) Collect).GetCommandHandler(),
                 // Options
                 ProcessIdOption(),
                 OutputPathOption(),
