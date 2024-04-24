@@ -24,6 +24,7 @@ namespace Microsoft.Diagnostics.Tools.Trace
         internal static bool IsQuiet
         { get; set; }
 
+
         public static class ProcessLogger {
             public static Action<string> WriteLine;
             public static Action<string> ErrorWriteLine;
@@ -73,10 +74,10 @@ namespace Microsoft.Diagnostics.Tools.Trace
             string name = null;
             bool showchildio = false;
             bool resumeRuntime = true;
-			string stoppingEventProviderName = null;
-			string stoppingEventEventName = null;
-			string stoppingEventPayloadFilter = null;
-			bool? rundown = null;
+            string stoppingEventProviderName = null;
+            string stoppingEventEventName = null;
+            string stoppingEventPayloadFilter = null;
+            bool? rundown = null;
 
             bool collectionStopped = false;
             bool cancelOnEnter = true;
