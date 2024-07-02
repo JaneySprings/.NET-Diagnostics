@@ -7,9 +7,10 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <!-- Tools always ship with stable versions to allow for seamless CLI upgrade experiences. -->
     <PreReleaseVersionLabel></PreReleaseVersionLabel>
+    <SelfContained>false</SelfContained>
   </PropertyGroup>
 
-  <Choose>
+  <!-- <Choose>
     <When Condition="'$(BundleTools)' == 'true'">
       <PropertyGroup>
         <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
@@ -27,5 +28,5 @@
         <PackagedShimOutputRootDirectory>$(OutputPath)</PackagedShimOutputRootDirectory>
       </PropertyGroup>
     </Otherwise>
-  </Choose>
+  </Choose> -->
 </Project>
