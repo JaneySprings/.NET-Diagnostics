@@ -19,12 +19,14 @@ using Microsoft.Internal.Common.Utils;
 
 namespace Microsoft.Diagnostics.Tools.Trace
 {
-    internal static class CollectCommandHandler
+    public static class CollectCommandHandler
     {
         internal static bool IsQuiet { get; set; }
+        internal static IConsole ExternalConsole { get; set; }
 
         private static void ConsoleWriteLine(string str)
         {
+            ExternalConsole?.Out?.Write(str);
             if (!IsQuiet)
             {
                 Console.Out.WriteLine(str);
@@ -57,7 +59,7 @@ namespace Microsoft.Diagnostics.Tools.Trace
         /// <param name="stoppingEventPayloadFilter">A string, parsed as [payload_field_name]:[payload_field_value] pairs separated by commas, that will stop the trace upon hitting an event with a matching payload. Requires `--stopping-event-provider-name` and `--stopping-event-event-name` to be set.</param>
         /// <param name="rundown">Collect rundown events.</param>
         /// <returns></returns>
-        private static async Task<int> Collect(CancellationToken ct, IConsole console, int processId, FileInfo output, uint buffersize, string providers, string profile, TraceFileFormat format, TimeSpan duration, string clrevents, string clreventlevel, string name, string diagnosticPort, bool showchildio, bool resumeRuntime, string stoppingEventProviderName, string stoppingEventEventName, string stoppingEventPayloadFilter, bool? rundown)
+        public static async Task<int> Collect(CancellationToken ct, IConsole console, int processId, FileInfo output, uint buffersize, string providers, string profile, TraceFileFormat format, TimeSpan duration, string clrevents, string clreventlevel, string name, string diagnosticPort, bool showchildio, bool resumeRuntime, string stoppingEventProviderName, string stoppingEventEventName, string stoppingEventPayloadFilter, bool? rundown)
         {
             bool collectionStopped = false;
             bool cancelOnEnter = true;
@@ -65,6 +67,7 @@ namespace Microsoft.Diagnostics.Tools.Trace
             bool printStatusOverTime = true;
             int ret = (int)ReturnCode.Ok;
             IsQuiet = showchildio;
+            ExternalConsole = console;
 
             try
             {
@@ -583,7 +586,7 @@ namespace Microsoft.Diagnostics.Tools.Trace
                 RundownOption()
             };
 
-        private static uint DefaultCircularBufferSizeInMB() => 256;
+        public static uint DefaultCircularBufferSizeInMB() => 256;
 
         private static Option CircularBufferOption() =>
             new(
